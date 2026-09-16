@@ -1,0 +1,1398 @@
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  New Content
+</body>
+</html> 
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>Chess - Player vs Computer</title>
+
+<style>
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    min-height:100vh;
+    background:#101827;
+    color:white;
+    font-family:Arial,sans-serif;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.game{
+    width:100%;
+    max-width:650px;
+    padding:10px;
+    text-align:center;
+}
+
+h1{
+    margin:5px 0 10px;
+    font-size:28px;
+}
+
+.top-panel{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+
+    background:#1f2937;
+    padding:10px;
+    border-radius:12px;
+    margin-bottom:10px;
+}
+
+.player{
+    font-weight:bold;
+}
+
+#status{
+    font-size:14px;
+    color:#facc15;
+}
+
+button{
+    border:none;
+    border-radius:8px;
+    padding:9px 14px;
+    background:#2563eb;
+    color:white;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+button:active{
+    transform:scale(.96);
+}
+
+.score{
+    display:flex;
+    justify-content:space-around;
+    background:#172033;
+    border-radius:10px;
+    padding:8px;
+    margin-bottom:10px;
+}
+
+.score span{
+    font-weight:bold;
+}
+
+/* BOARD */
+
+.board-wrapper{
+    width:100%;
+    padding:5px;
+    background:#0b1220;
+    border-radius:12px;
+}
+
+#board{
+    width:min(92vw,560px);
+    height:min(92vw,560px);
+
+    margin:0 auto;
+
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    grid-template-rows:repeat(8,1fr);
+
+    aspect-ratio:1 / 1;
+
+    border-radius:8px;
+    overflow:hidden;
+
+    box-shadow:
+        0 10px 30px rgba(0,0,0,.45);
+}
+
+.square{
+    width:100%;
+    height:100%;
+
+    min-width:0;
+    min-height:0;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    position:relative;
+
+    font-size:clamp(28px,7vw,62px);
+
+    cursor:pointer;
+    user-select:none;
+
+    transition:filter .12s;
+}
+
+.light{
+    background:#f0d9b5;
+}
+
+.dark{
+    background:#b58863;
+}
+
+.square:hover{
+    filter:brightness(1.08);
+}
+
+/* SELECTED */
+
+.selected{
+    box-shadow:
+        inset 0 0 0 5px #22c55e;
+}
+
+/* LEGAL MOVE */
+
+.move::after{
+    content:"";
+    width:22%;
+    height:22%;
+    border-radius:50%;
+    background:rgba(0,0,0,.35);
+    position:absolute;
+}
+
+/* CAPTURE */
+
+.capture{
+    box-shadow:
+        inset 0 0 0 5px rgba(239,68,68,.75);
+}
+
+/* CHECK */
+
+.check{
+    box-shadow:
+        inset 0 0 0 6px #ef4444;
+}
+
+/* GAME OVER */
+
+.gameover{
+    margin-top:10px;
+    padding:10px;
+    border-radius:10px;
+    background:#1f2937;
+    font-weight:bold;
+}
+
+/* MOBILE */
+
+@media(max-width:500px){
+
+    .game{
+        width:100%;
+        padding:8px;
+    }
+
+    .board-wrapper{
+        width:100%;
+        padding:5px;
+        border-radius:12px;
+    }
+
+    #board{
+        width:100%;
+        height:auto;
+        aspect-ratio:1 / 1;
+    }
+
+    .square{
+        font-size:clamp(25px,9vw,42px);
+    }
+
+    h1{
+        font-size:23px;
+    }
+
+    .top-panel{
+        font-size:13px;
+    }
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="game">
+
+    <h1>♟️ Chess</h1>
+
+    <div class="top-panel">
+
+        <div class="player">
+            👤 Player
+        </div>
+
+        <div id="status">
+            Your Turn
+        </div>
+
+        <div class="player">
+            🤖 Computer
+        </div>
+
+    </div>
+
+    <div class="score">
+
+        <span>
+            👤 Score:
+            <b id="playerScore">0</b>
+        </span>
+
+        <span>
+            🤖 Score:
+            <b id="computerScore">0</b>
+        </span>
+
+        <button onclick="restartGame()">
+            🔄 Restart
+        </button>
+
+    </div>
+
+    <div class="board-wrapper">
+        <div id="board"></div>
+    </div>
+
+    <div id="gameMessage"
+         class="gameover">
+        ♟️ You are White
+    </div>
+
+</div>
+
+
+<script>
+
+/* =========================
+   PIECES
+========================= */
+
+const pieces = {
+
+    wK:"♔",
+    wQ:"♕",
+    wR:"♖",
+    wB:"♗",
+    wN:"♘",
+    wP:"♙",
+
+    bK:"♚",
+    bQ:"♛",
+    bR:"♜",
+    bB:"♝",
+    bN:"♞",
+    bP:"♟"
+};
+
+
+/* PIECE VALUES */
+
+const value = {
+
+    P:1,
+    N:3,
+    B:3,
+    R:5,
+    Q:9,
+    K:0
+
+};
+
+
+let board;
+
+let selected = null;
+
+let turn = "w";
+
+let gameOver = false;
+
+let playerScore = 0;
+
+let computerScore = 0;
+
+
+/* =========================
+   STARTING BOARD
+========================= */
+
+function startingBoard(){
+
+    return [
+
+        ["bR","bN","bB","bQ","bK","bB","bN","bR"],
+
+        ["bP","bP","bP","bP","bP","bP","bP","bP"],
+
+        [null,null,null,null,null,null,null,null],
+
+        [null,null,null,null,null,null,null,null],
+
+        [null,null,null,null,null,null,null,null],
+
+        [null,null,null,null,null,null,null,null],
+
+        ["wP","wP","wP","wP","wP","wP","wP","wP"],
+
+        ["wR","wN","wB","wQ","wK","wB","wN","wR"]
+
+    ];
+}
+
+
+/* =========================
+   RESTART
+========================= */
+
+function restartGame(){
+
+    board = startingBoard();
+
+    selected = null;
+
+    turn = "w";
+
+    gameOver = false;
+
+    playerScore = 0;
+
+    computerScore = 0;
+
+    updateScore();
+
+    document.getElementById("status").textContent =
+        "Your Turn";
+
+    document.getElementById("gameMessage").textContent =
+        "♟️ You are White";
+
+    drawBoard();
+}
+
+
+/* =========================
+   DRAW BOARD
+========================= */
+
+function drawBoard(){
+
+    const boardElement =
+        document.getElementById("board");
+
+    boardElement.innerHTML = "";
+
+
+    for(let r=0;r<8;r++){
+
+        for(let c=0;c<8;c++){
+
+            const square =
+                document.createElement("div");
+
+
+            square.className =
+                "square " +
+                ((r+c)%2===0
+                    ? "light"
+                    : "dark");
+
+
+            const piece = board[r][c];
+
+
+            if(piece){
+
+                square.textContent =
+                    pieces[piece];
+            }
+
+
+            /* SELECTED */
+
+            if(selected &&
+               selected.r===r &&
+               selected.c===c){
+
+                square.classList.add("selected");
+            }
+
+
+            /* LEGAL MOVES */
+
+            if(selected){
+
+                const moves =
+                    getLegalMoves(
+                        selected.r,
+                        selected.c
+                    );
+
+                const found =
+                    moves.some(
+                        m =>
+                        m.r===r &&
+                        m.c===c
+                    );
+
+                if(found){
+
+                    if(piece){
+
+                        square.classList.add(
+                            "capture"
+                        );
+
+                    }else{
+
+                        square.classList.add(
+                            "move"
+                        );
+                    }
+                }
+            }
+
+
+            /* CHECK */
+
+            if(piece &&
+               piece[1]==="K" &&
+               isInCheck(piece[0],board)){
+
+                square.classList.add("check");
+            }
+
+
+            square.onclick =
+                () => clickSquare(r,c);
+
+
+            boardElement.appendChild(square);
+        }
+    }
+}
+
+
+/* =========================
+   PLAYER CLICK
+========================= */
+
+function clickSquare(r,c){
+
+    if(gameOver) return;
+
+    if(turn!=="w") return;
+
+
+    const piece = board[r][c];
+
+
+    /* SELECT PIECE */
+
+    if(!selected){
+
+        if(piece && piece[0]==="w"){
+
+            selected = {r,c};
+
+            drawBoard();
+        }
+
+        return;
+    }
+
+
+    /* CLICK ANOTHER WHITE PIECE */
+
+    if(piece && piece[0]==="w"){
+
+        selected = {r,c};
+
+        drawBoard();
+
+        return;
+    }
+
+
+    /* MOVE */
+
+    const legalMoves =
+        getLegalMoves(
+            selected.r,
+            selected.c
+        );
+
+
+    const valid =
+        legalMoves.some(
+            m =>
+            m.r===r &&
+            m.c===c
+        );
+
+
+    if(!valid){
+
+        selected = null;
+
+        drawBoard();
+
+        return;
+    }
+
+
+    makeMove(
+        selected.r,
+        selected.c,
+        r,
+        c
+    );
+
+
+    selected = null;
+
+    drawBoard();
+
+
+    /* CHECKMATE */
+
+    if(isCheckmate("b")){
+
+        gameOver = true;
+
+        playerScore += 10;
+
+        updateScore();
+
+        document.getElementById("status")
+            .textContent =
+            "🏆 Checkmate! You Win!";
+
+        document.getElementById("gameMessage")
+            .textContent =
+            "🎉 Congratulations! Checkmate.";
+
+        drawBoard();
+
+        return;
+    }
+
+
+    /* STALEMATE */
+
+    if(isStalemate("b")){
+
+        gameOver = true;
+
+        document.getElementById("status")
+            .textContent =
+            "🤝 Stalemate!";
+
+        document.getElementById("gameMessage")
+            .textContent =
+            "Game Draw";
+
+        return;
+    }
+
+
+    turn = "b";
+
+    if(isInCheck("b",board)){
+
+        document.getElementById("status")
+            .textContent =
+            "⚠️ Computer is in Check";
+
+    }else{
+
+        document.getElementById("status")
+            .textContent =
+            "🤖 Computer Thinking...";
+    }
+
+
+    setTimeout(computerMove,700);
+}
+
+
+/* =========================
+   MAKE MOVE
+========================= */
+
+function makeMove(sr,sc,r,c){
+
+    const captured = board[r][c];
+
+
+    /* SCORE */
+
+    if(captured){
+
+        if(captured[0]==="b"){
+
+            playerScore +=
+                value[captured[1]];
+
+        }else{
+
+            computerScore +=
+                value[captured[1]];
+        }
+    }
+
+
+    board[r][c] =
+        board[sr][sc];
+
+    board[sr][sc] =
+        null;
+
+
+    /* PAWN PROMOTION */
+
+    if(board[r][c]==="wP" && r===0){
+
+        board[r][c]="wQ";
+    }
+
+
+    if(board[r][c]==="bP" && r===7){
+
+        board[r][c]="bQ";
+    }
+
+
+    updateScore();
+}
+
+
+/* =========================
+   LEGAL MOVES
+========================= */
+
+function getLegalMoves(r,c){
+
+    const piece = board[r][c];
+
+    if(!piece) return [];
+
+
+    const color = piece[0];
+
+    const moves = [];
+
+
+    for(let tr=0;tr<8;tr++){
+
+        for(let tc=0;tc<8;tc++){
+
+            if(isBasicMove(
+                r,c,tr,tc,board
+            )){
+
+                const copy =
+                    copyBoard(board);
+
+                copy[tr][tc] =
+                    copy[r][c];
+
+                copy[r][c] =
+                    null;
+
+
+                /* PROMOTION */
+
+                if(copy[tr][tc]==="wP" &&
+                   tr===0){
+
+                    copy[tr][tc]="wQ";
+                }
+
+                if(copy[tr][tc]==="bP" &&
+                   tr===7){
+
+                    copy[tr][tc]="bQ";
+                }
+
+
+                /* KING MUST NOT BE IN CHECK */
+
+                if(!isInCheck(color,copy)){
+
+                    moves.push({
+                        r:tr,
+                        c:tc
+                    });
+                }
+            }
+        }
+    }
+
+    return moves;
+}
+
+
+/* =========================
+   BASIC MOVE
+========================= */
+
+function isBasicMove(sr,sc,r,c,b){
+
+    if(sr===r && sc===c)
+        return false;
+
+
+    const piece = b[sr][sc];
+
+    if(!piece)
+        return false;
+
+
+    const target = b[r][c];
+
+
+    /* SAME COLOUR */
+
+    if(target &&
+       target[0]===piece[0]){
+
+        return false;
+    }
+
+
+    const type = piece[1];
+
+    const color = piece[0];
+
+    const dr = r-sr;
+
+    const dc = c-sc;
+
+    const adr = Math.abs(dr);
+
+    const adc = Math.abs(dc);
+
+
+    /* PAWN */
+
+    if(type==="P"){
+
+        const direction =
+            color==="w" ? -1 : 1;
+
+        const start =
+            color==="w" ? 6 : 1;
+
+
+        /* FORWARD */
+
+        if(dc===0 && !target){
+
+            if(dr===direction)
+                return true;
+
+
+            if(sr===start &&
+               dr===2*direction &&
+               !b[sr+direction][sc]){
+
+                return true;
+            }
+        }
+
+
+        /* CAPTURE */
+
+        if(adc===1 &&
+           dr===direction &&
+           target &&
+           target[0]!==color){
+
+            return true;
+        }
+
+
+        return false;
+    }
+
+
+    /* KNIGHT */
+
+    if(type==="N"){
+
+        return (
+            (adr===2 && adc===1) ||
+            (adr===1 && adc===2)
+        );
+    }
+
+
+    /* KING */
+
+    if(type==="K"){
+
+        return (
+            adr<=1 &&
+            adc<=1
+        );
+    }
+
+
+    /* ROOK */
+
+    if(type==="R"){
+
+        if(sr!==r && sc!==c)
+            return false;
+
+        return clearPath(
+            sr,sc,r,c,b
+        );
+    }
+
+
+    /* BISHOP */
+
+    if(type==="B"){
+
+        if(adr!==adc)
+            return false;
+
+        return clearPath(
+            sr,sc,r,c,b
+        );
+    }
+
+
+    /* QUEEN */
+
+    if(type==="Q"){
+
+        const straight =
+            sr===r || sc===c;
+
+        const diagonal =
+            adr===adc;
+
+        if(!straight && !diagonal)
+            return false;
+
+        return clearPath(
+            sr,sc,r,c,b
+        );
+    }
+
+
+    return false;
+}
+
+
+/* =========================
+   PATH CHECK
+========================= */
+
+function clearPath(sr,sc,r,c,b){
+
+    const stepR =
+        Math.sign(r-sr);
+
+    const stepC =
+        Math.sign(c-sc);
+
+
+    let cr =
+        sr+stepR;
+
+    let cc =
+        sc+stepC;
+
+
+    while(cr!==r || cc!==c){
+
+        if(b[cr][cc])
+            return false;
+
+        cr += stepR;
+        cc += stepC;
+    }
+
+
+    return true;
+}
+
+
+/* =========================
+   CHECK
+========================= */
+
+function isInCheck(color,b){
+
+    let king = null;
+
+
+    for(let r=0;r<8;r++){
+
+        for(let c=0;c<8;c++){
+
+            if(b[r][c]===color+"K"){
+
+                king = {r,c};
+            }
+        }
+    }
+
+
+    if(!king)
+        return true;
+
+
+    const enemy =
+        color==="w" ? "b" : "w";
+
+
+    for(let r=0;r<8;r++){
+
+        for(let c=0;c<8;c++){
+
+            if(b[r][c] &&
+               b[r][c][0]===enemy){
+
+                if(isAttack(
+                    r,c,
+                    king.r,
+                    king.c,
+                    b
+                )){
+
+                    return true;
+                }
+            }
+        }
+    }
+
+
+    return false;
+}
+
+
+/* =========================
+   ATTACK CHECK
+========================= */
+
+function isAttack(sr,sc,r,c,b){
+
+    const piece = b[sr][sc];
+
+    if(!piece)
+        return false;
+
+
+    const type = piece[1];
+
+    const dr = r-sr;
+
+    const dc = c-sc;
+
+    const adr = Math.abs(dr);
+
+    const adc = Math.abs(dc);
+
+
+    /* PAWN */
+
+    if(type==="P"){
+
+        const direction =
+            piece[0]==="w"
+                ? -1
+                : 1;
+
+        return (
+            dr===direction &&
+            adc===1
+        );
+    }
+
+
+    /* KNIGHT */
+
+    if(type==="N"){
+
+        return (
+            (adr===2 && adc===1) ||
+            (adr===1 && adc===2)
+        );
+    }
+
+
+    /* KING */
+
+    if(type==="K"){
+
+        return (
+            adr<=1 &&
+            adc<=1
+        );
+    }
+
+
+    /* ROOK */
+
+    if(type==="R"){
+
+        if(sr!==r && sc!==c)
+            return false;
+
+        return clearPath(
+            sr,sc,r,c,b
+        );
+    }
+
+
+    /* BISHOP */
+
+    if(type==="B"){
+
+        if(adr!==adc)
+            return false;
+
+        return clearPath(
+            sr,sc,r,c,b
+        );
+    }
+
+
+    /* QUEEN */
+
+    if(type==="Q"){
+
+        if(
+            sr!==r &&
+            sc!==c &&
+            adr!==adc
+        ){
+
+            return false;
+        }
+
+        return clearPath(
+            sr,sc,r,c,b
+        );
+    }
+
+
+    return false;
+}
+
+
+/* =========================
+   ALL MOVES
+========================= */
+
+function allLegalMoves(color){
+
+    const result=[];
+
+
+    for(let r=0;r<8;r++){
+
+        for(let c=0;c<8;c++){
+
+            if(
+                board[r][c] &&
+                board[r][c][0]===color
+            ){
+
+                const moves =
+                    getLegalMoves(r,c);
+
+
+                moves.forEach(m => {
+
+                    result.push({
+
+                        sr:r,
+                        sc:c,
+
+                        r:m.r,
+                        c:m.c
+                    });
+
+                });
+            }
+        }
+    }
+
+
+    return result;
+}
+
+
+/* =========================
+   CHECKMATE
+========================= */
+
+function isCheckmate(color){
+
+    return (
+        isInCheck(color,board) &&
+        allLegalMoves(color).length===0
+    );
+}
+
+
+/* =========================
+   STALEMATE
+========================= */
+
+function isStalemate(color){
+
+    return (
+        !isInCheck(color,board) &&
+        allLegalMoves(color).length===0
+    );
+}
+
+
+/* =========================
+   COMPUTER AI
+========================= */
+
+function computerMove(){
+
+    if(gameOver)
+        return;
+
+
+    const moves =
+        allLegalMoves("b");
+
+
+    if(moves.length===0){
+
+        if(isCheckmate("b")){
+
+            gameOver=true;
+
+            playerScore += 10;
+
+            updateScore();
+
+            document.getElementById("status")
+                .textContent =
+                "🏆 Checkmate! You Win!";
+        }
+
+        return;
+    }
+
+
+    /*
+       COMPUTER LOOKS FOR
+       CAPTURE MOVES FIRST
+    */
+
+    let captureMoves =
+        moves.filter(
+            m => board[m.r][m.c]
+        );
+
+
+    let selectedMove;
+
+
+    if(captureMoves.length>0){
+
+        /*
+          Choose strongest capture
+        */
+
+        captureMoves.sort(
+            (a,b) =>
+            pieceScore(
+                board[b.r][b.c]
+            )
+            -
+            pieceScore(
+                board[a.r][a.c]
+            )
+        );
+
+
+        selectedMove =
+            captureMoves[0];
+
+    }else{
+
+        /*
+          Random legal move
+        */
+
+        selectedMove =
+            moves[
+                Math.floor(
+                    Math.random() *
+                    moves.length
+                )
+            ];
+    }
+
+
+    makeMove(
+        selectedMove.sr,
+        selectedMove.sc,
+        selectedMove.r,
+        selectedMove.c
+    );
+
+
+    turn="w";
+
+
+    drawBoard();
+
+
+    /* COMPUTER CHECKMATE */
+
+    if(isCheckmate("w")){
+
+        gameOver=true;
+
+        computerScore += 10;
+
+        updateScore();
+
+        document.getElementById("status")
+            .textContent =
+            "💻 Checkmate! Computer Wins!";
+
+        document.getElementById("gameMessage")
+            .textContent =
+            "🤖 Computer wins!";
+
+        drawBoard();
+
+        return;
+    }
+
+
+    /* STALEMATE */
+
+    if(isStalemate("w")){
+
+        gameOver=true;
+
+        document.getElementById("status")
+            .textContent =
+            "🤝 Stalemate!";
+
+        document.getElementById("gameMessage")
+            .textContent =
+            "Game Draw";
+
+        return;
+    }
+
+
+    /* CHECK */
+
+    if(isInCheck("w",board)){
+
+        document.getElementById("status")
+            .textContent =
+            "⚠️ CHECK! Your King is attacked!";
+
+        document.getElementById("gameMessage")
+            .textContent =
+            "⚠️ Your King is in Check!";
+
+    }else{
+
+        document.getElementById("status")
+            .textContent =
+            "♟️ Your Turn";
+
+        document.getElementById("gameMessage")
+            .textContent =
+            "Your move";
+    }
+}
+
+
+/* =========================
+   PIECE SCORE
+========================= */
+
+function pieceScore(piece){
+
+    if(!piece)
+        return 0;
+
+    return value[piece[1]] || 0;
+}
+
+
+/* =========================
+   COPY BOARD
+========================= */
+
+function copyBoard(b){
+
+    return b.map(
+        row => [...row]
+    );
+}
+
+
+/* =========================
+   SCORE DISPLAY
+========================= */
+
+function updateScore(){
+
+    document.getElementById(
+        "playerScore"
+    ).textContent =
+        playerScore;
+
+
+    document.getElementById(
+        "computerScore"
+    ).textContent =
+        computerScore;
+}
+
+
+/* =========================
+   START GAME
+========================= */
+
+restartGame();
+
+</script>
+
+</
